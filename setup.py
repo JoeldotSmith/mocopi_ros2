@@ -16,7 +16,7 @@ setup(
     maintainer='joelsmith',
     maintainer_email='23338559@student.uwa.edu.au',
     description='Connect mocopi motion tracking to Ros2',
-    license='TODO: License declaration',
+    license='',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [

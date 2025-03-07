@@ -17,9 +17,23 @@ joint_map = [
 ]
  
 def is_field(name):
+    """
+    The is_field function quoted from:
+    Project: mcp-receiver
+    URL: https://github.com/seagetch/mcp-receiver
+    LICENSE: MIT
+    Copyright (c) 2022 seagetch
+    """
     return name.isalpha()
  
 def _deserialize(data, index, length, is_list=False):
+    """
+    The deserialize function quoted from:
+    Project: mcp-receiver
+    URL: https://github.com/seagetch/mcp-receiver
+    LICENSE: MIT
+    Copyright (c) 2022 seagetch
+    """
     result = [] if is_list else {}
     end_pos = index + length
     while end_pos - index > 8 and is_field(data[index+4:index+8]):
@@ -40,6 +54,13 @@ def _deserialize(data, index, length, is_list=False):
         return result, index
  
 def _process_packet(message):
+    """
+    The process_packet function quoted from:
+    Project: mcp-receiver
+    URL: https://github.com/seagetch/mcp-receiver
+    LICENSE: MIT
+    Copyright (c) 2022 seagetch
+    """
     data = _deserialize(message, 0, len(message), False)[0]
     data["head"]["ftyp"] = data["head"]["ftyp"].decode()
     data["head"]["vrsn"] = ord(data["head"]["vrsn"])
@@ -59,6 +80,12 @@ def _process_packet(message):
     return data
  
 class MocopiReceiver(Node):
+    """
+    The MocopiReciever class was based on:
+    Project: mocopi_ros
+    URL: https://github.com/hello-world-lab/mocopi_ros
+    LICENSE: MIT
+    """
     def __init__(self):
         super().__init__('mocopi_receiver')
         self.br = tf2_ros.TransformBroadcaster(self)
