@@ -10,12 +10,53 @@ import tf2_ros
 from geometry_msgs.msg import TransformStamped
  
 joint_map = [
-    "root", "torso_1", "torso_2", "torso_3", "torso_4", "torso_5", "torso_6", "torso_7",
-    "neck_1", "neck_2", "head", "l_shoulder", "l_up_arm", "l_low_arm", "l_hand",
-    "r_shoulder", "r_up_arm", "r_low_arm", "r_hand", "l_up_leg", "l_low_leg",
-    "l_foot", "l_toes", "r_up_leg", "r_low_leg", "r_foot", "r_toes"
+    "root", # 0
+    "torso_0", # 1
+    "torso_1", # 2
+    "torso_2", # 3
+    "neck", # 4
+    "head", # 5
+    "l_shoulder", # 6
+    "l_up_arm", # 7
+    "l_low_arm", # 8
+    "l_hand", # 9
+    "r_shoulder", # 10
+    "r_up_arm", # 11
+    "r_low_arm", # 12
+    "r_hand", # 13
+    "l_up_leg", # 14
+    "l_low_leg", # 15
+    "l_foot", # 16
+    "r_up_leg", # 17
+    "r_low_leg", # 18
+    "r_foot", # 19
 ]
- 
+
+pairs = [
+    (99, 0),  # base to root
+    (0, 1),   # root to torso_0
+    (1, 2),   # torso_0 to torso_1
+    (2, 3),   # torso_1 to torso_2
+    (3, 4),   # torso_2 to neck
+    (4, 5),   # neck to head
+    (3, 6),   # torso_2 to l_shoulder
+    (6, 7),   # l_shoulder to l_up_arm
+    (7, 8),   # l_up_arm to l_low_arm
+    (8, 9),   # l_low_arm to l_hand
+    (3, 10),  # torso_2 to r_shoulder
+    (10, 11), # r_shoulder to r_up_arm
+    (11, 12), # r_up_arm to r_low_arm
+    (12, 13), # r_low_arm to r_hand
+    (0, 14),  # root to l_up_leg
+    (14, 15), # l_up_leg to l_low_leg
+    (15, 16), # l_low_leg to l_foot
+    (0, 17),  # root to r_up_leg
+    (17, 18), # r_up_leg to r_low_leg
+    (18, 19), # r_low_leg to r_foot
+]
+
+
+
 def is_field(name):
     """
     The is_field function quoted from:
@@ -126,11 +167,7 @@ class MocopiReceiver(Node):
         transforms = []
  
         if "fram" in data:
-            for (p, c) in [(99, 0)] + [(i, i+1) for i in range(0, 10)] + \
-                          [(7, 11)] + [(i, i+1) for i in range(11, 14)] + \
-                          [(7, 15)] + [(i, i+1) for i in range(15, 18)] + \
-                          [(0, 19)] + [(i, i+1) for i in range(19, 22)] + \
-                          [(0, 23)] + [(i, i+1) for i in range(23, 26)]:
+            for (p, c) in pairs:
                 trans = self.make_tf(p, c, data)
                 if trans:
                     transforms.append(trans)
