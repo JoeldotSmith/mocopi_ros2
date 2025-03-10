@@ -10,20 +10,6 @@ Panels:
         - /Axes1
       Splitter Ratio: 0.5
     Tree Height: 549
-  - Class: rviz_common/Selection
-    Name: Selection
-  - Class: rviz_common/Tool Properties
-    Expanded:
-      - /2D Pose Estimate1
-      - /2D Nav Goal1
-      - /Publish Point1
-    Name: Tool Properties
-    Splitter Ratio: 0.5886790156364441
-  - Class: rviz_common/Views
-    Expanded:
-      - /Current View1
-    Name: Views
-    Splitter Ratio: 0.5
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -44,15 +30,25 @@ Visualization Manager:
       Offset: {X: 0, Y: 0, Z: 0}
       Plane: XY
       Plane Cell Count: 10
-      Reference Frame: pelvis  # Changed from <Fixed Frame>
+      Reference Frame: pelvis
       Value: true
+
+    - Class: rviz_default_plugins/RobotModel
+      Enabled: true
+      Name: Robot Model
+      Robot Description: /robot_description
+      Description Topic: /robot_description
+      Alpha: 1
+      Collision Enabled: false
+      Update Interval: 0
+      Visual Enabled: true
 
     - Class: rviz_default_plugins/TF
       Enabled: true
       Frame Timeout: 15
       Frames:
         All Enabled: true
-        pelvis: {Value: true}  # Added pelvis as root
+        pelvis: {Value: true}
         head: {Value: true}
         l_foot: {Value: true}
         l_hand: {Value: true}
