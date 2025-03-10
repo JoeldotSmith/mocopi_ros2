@@ -3,13 +3,16 @@
 <package format="3">
   <name>mocopi_ros2</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>Mocopi to ros2 package</description>
   <maintainer email="23338559@student.uwa.edu.au">joelsmith</maintainer>
-  <license>TODO: License declaration</license>
+  <license>MIT</license>
 
   <depend>rclpy</depend>
   <depend>tf2_ros</depend>
   <depend>geometry_msgs</depend>
+  <depend>robot_state_publisher</depend>
+  <depend>rviz2</depend>
+  <exec_depend>launch</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
@@ -18,5 +21,7 @@
 
   <export>
     <build_type>ament_python</build_type>
+    <launch file="launch/display.launch.py"/>
   </export>
 </package>
+

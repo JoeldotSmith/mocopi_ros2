@@ -1,4 +1,5 @@
 from setuptools import setup
+from glob import glob
 
 package_name = 'mocopi_ros2'
 
@@ -10,6 +11,13 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch', ['launch/display.launch.py']),
+        ('share/' + package_name + '/config', ['config/mocopi_view.rviz']),
+        ('share/' + package_name + '/urdf', ['urdf/g1_29dof_lock_waist.urdf']),
+        ('share/' + package_name + '/urdf', glob('urdf/*.urdf')),
+        ('share/' + package_name + '/urdf', ['urdf/g1_29dof_lock_waist.xml']),
+        ('share/' + package_name + '/urdf/meshes', glob('urdf/meshes/*.STL')),
+        ('share/' + package_name + '/urdf/images', glob('urdf/images/*.png')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -24,3 +32,4 @@ setup(
         ],
     },
 )
+
