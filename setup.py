@@ -29,6 +29,7 @@ setup(
     entry_points={
         'console_scripts': [
             'mocopi_receiver = mocopi_ros2.mocopi_receiver:main',
+            'log_mocopi_receiver = mocopi_ros2.log_version:main',
         ],
     },
 )

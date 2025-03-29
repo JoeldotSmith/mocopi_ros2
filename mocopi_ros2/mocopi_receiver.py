@@ -2,11 +2,17 @@ import socket
 import struct
 import math
 import rclpy
+import time
+import numpy as np
 from rclpy.node import Node
+from std_msgs.msg import String
 from rclpy.time import Time
 import tf2_ros
 from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import JointState
+from geometry_msgs.msg import Quaternion
+from scipy.spatial.transform import Rotation
+
 
 # Mocopi joint names and hierarchy
 joint_map = [
@@ -39,68 +45,62 @@ joint_map = [
     "r_toes"       # 26
 ]
 
-# all urdf joints
-# floating_base_joint
-# pelvis_contour_joint
-# left_hip_pitch_joint
-# left_hip_roll_joint
-# left_hip_yaw_joint
-# left_knee_joint
-# left_ankle_pitch_joint
-# left_ankle_roll_joint
-# right_hip_pitch_joint
-# right_hip_roll_joint
-# right_hip_yaw_joint
-# right_knee_joint
-# right_ankle_pitch_joint
-# right_ankle_roll_joint
-# waist_yaw_joint/
-# waist_roll_joint
-# waist_pitch_joint
-# logo_joint
-# head_joint
-# waist_support_joint
-# imu_in_torso_joint
-# imu_in_pelvis_joint
-# d435_joint
-# mid360_joint
-# left_shoulder_pitch_joint
-# left_shoulder_roll_joint
-# left_shoulder_yaw_joint
-# left_elbow_joint
-# left_wrist_roll_joint
-# left_wrist_pitch_joint
-# left_wrist_yaw_joint
-# left_hand_palm_joint
-# right_shoulder_pitch_joint
-# right_shoulder_roll_joint
-# right_shoulder_yaw_joint
-# right_elbow_joint
-# right_wrist_roll_joint
-# right_wrist_pitch_joint
-# right_wrist_yaw_joint
-# right_hand_palm_joint
 mapping = {
-        "root": [("floating_base_joint", None)],
-        "torso_1": [("pelvis_contour_joint", None)],
-        "torso_7": [("waist_yaw_joint", "yaw"), ("waist_roll_joint", "roll"), ("waist_pitch_joint", "pitch")],
-        "neck_2": [("logo_joint", None)],
-        "head": [("head_joint", "yaw")],
-        "l_shoulder": [("left_shoulder_pitch_joint", "pitch"), ("left_shoulder_roll_joint", "roll"), ("left_shoulder_yaw_joint", "yaw")],
-        "l_up_arm": [("left_elbow_joint", "pitch")],
-        "l_low_arm": [("left_wrist_roll_joint", "roll"), ("left_wrist_pitch_joint", "pitch"), ("left_wrist_yaw_joint", "yaw")],
-        "l_hand": [("left_hand_palm_joint", None)],
-        "r_shoulder": [("right_shoulder_pitch_joint", "pitch"), ("right_shoulder_roll_joint", "roll"), ("right_shoulder_yaw_joint", "yaw")],
-        "r_up_arm": [("right_elbow_joint", "pitch")],
-        "r_low_arm": [("right_wrist_roll_joint", "roll"), ("right_wrist_pitch_joint", "pitch"), ("right_wrist_yaw_joint", "yaw")],
-        "r_hand": [("right_hand_palm_joint", None)],
-        "l_up_leg": [("left_hip_pitch_joint", "pitch"), ("left_hip_roll_joint", "roll"), ("left_hip_yaw_joint", "yaw")],
-        "l_low_leg": [("left_knee_joint", "pitch")],
-        "l_foot": [("left_ankle_pitch_joint", "pitch"), ("left_ankle_roll_joint", "roll")],
-        "r_up_leg": [("right_hip_pitch_joint", "pitch"), ("right_hip_roll_joint", "roll"), ("right_hip_yaw_joint", "yaw")],
-        "r_low_leg": [("right_knee_joint", "pitch")],
-        "r_foot": [("right_ankle_pitch_joint", "pitch"), ("right_ankle_roll_joint", "roll")]
-    }
+    "root": [("pelvis_contour_joint", None)],
+    "torso_1": [("waist_yaw_joint", "yaw"), ("waist_roll_joint", "roll"), ("waist_pitch_joint", "pitch")],
+
+    # Left Arm
+    "l_up_arm": [
+        ("left_shoulder_pitch_joint", "pitch"),
+        ("left_shoulder_roll_joint", "roll"),
+        ("left_shoulder_yaw_joint", "yaw")
+    ],
+    "l_hand": [("left_elbow_joint", "pitch")],
+    "l_shoulder": [("left_wrist_pitch_joint", None)],
+    "l_low_arm": [
+        ("left_hand_palm_joint", None),
+        ("left_wrist_roll_joint", None),
+        ("left_wrist_yaw_joint", None)
+    ],
+
+    # Right Arm
+    "r_up_arm": [
+        ("right_shoulder_pitch_joint", "pitch"),
+        ("right_shoulder_roll_joint", "roll"),
+        ("right_shoulder_yaw_joint", "yaw")
+    ],
+    "r_hand": [("right_elbow_joint", "pitch")],
+    "r_shoulder": [("right_wrist_pitch_joint", None)],
+    "r_low_arm": [
+        ("right_wrist_roll_joint", None),
+        ("right_wrist_pitch_joint", None),
+        ("right_wrist_yaw_joint", None)
+    ],
+
+    # Left Leg
+    "l_up_leg": [
+        ("left_hip_pitch_joint", "pitch"),
+        ("left_hip_roll_joint", "roll"),
+        ("left_hip_yaw_joint", "yaw")
+    ],
+    "l_low_leg": [("left_knee_joint", "pitch")],
+    "l_foot": [
+        ("left_ankle_pitch_joint", "pitch"),
+        ("left_ankle_roll_joint", "roll")
+    ],
+
+    # Right Leg
+    "r_up_leg": [
+        ("right_hip_pitch_joint", "pitch"),
+        ("right_hip_roll_joint", "roll"),
+        ("right_hip_yaw_joint", "yaw")
+    ],
+    "r_low_leg": [("right_knee_joint", "pitch")],
+    "r_foot": [
+        ("right_ankle_pitch_joint", "pitch"),
+        ("right_ankle_roll_joint", "roll")
+    ]
+}
 
 pairs = [
     (99, 0),  # base to root
@@ -115,13 +115,14 @@ pairs = [
     (23, 24), (24, 25), (25, 26)   # right leg
 ]
 
-def quaternion_to_euler(w, x, y, z):
-    roll = math.atan2(2*(w*x + y*z), 1-2*(x*x+y*y))
-    pitch = math.asin(2*(w*y - z*x))
-    yaw = math.atan2(2*(w*z+x*y), 1-2*(y*y+z*z))
-    return roll, pitch, yaw
+def QuaternionToE(x, y, z, w):
+    r = Rotation.from_quat([x, y, z, w])
+    return r.as_euler('xyz', degrees=False)  
 
-
+def rotate_quaternion(q, axis):
+    rot_90 = Rotation.from_euler(axis, 90, degrees=True).as_quat()
+    q_rot = Rotation.from_quat(q) * Rotation.from_quat(rot_90)
+    return q_rot.as_quat()
 
 def is_field(name):
     return name.isalpha()
@@ -170,18 +171,49 @@ class MocopiReceiver(Node):
         super().__init__('mocopi_receiver')
         self.br = tf2_ros.TransformBroadcaster(self)
         self.joint_state_pub = self.create_publisher(JointState, '/joint_states', 10)
+        self.wave_pub = self.create_publisher(String, '/wave_detector', 10)
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind(("", 12351))
         self.get_logger().info("Mocopi receiver started")
         self.timer = self.create_timer(0.01, self.receive_data)
+
+
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+
+        self.hand_positions = []  
+        self.last_wave_time = 0
+        self.wave_threshold = 0.15 
+        self.time_window = 5  
+    
+    def detect_wave(self, roll, z_pos):
+        current_time = time.time()
+        self.hand_positions.append((current_time, roll, z_pos))
+
+        self.hand_positions = [p for p in self.hand_positions if current_time - p[0] < self.time_window]
+
+        if len(self.hand_positions) < 4: 
+            return False
+
+        x_positions = [pos[1] for pos in self.hand_positions]
+        z_positions = [pos[2] for pos in self.hand_positions]
+        
+        movement_range = max(x_positions) - min(x_positions)
+        avg_z_pos = sum(z_positions) / len(z_positions)
+
+        sign_changes = sum(1 for i in range(1, len(x_positions)) if (x_positions[i] - x_positions[i-1]) * (x_positions[i-1] - x_positions[i-2]) < 0)
+
+        if ( movement_range > self.wave_threshold and avg_z_pos > 1.5 and sign_changes >= 2 and  (current_time - self.last_wave_time) > self.time_window):
+            self.last_wave_time = current_time
+            self.wave_pub.publish(String(data="Wave detected"))
 
     def receive_data(self):
         try:
             message, _ = self.socket.recvfrom(2048)
             data = _process_packet(message)
             self.broadcast_transforms(data)
-        except KeyError as e:
-            self.get_logger().error(f"Socket error: {e}")
+        except Exception as e:
+            print()
 
     def make_tf(self, pframe_id, cframe_id, data):
         t = TransformStamped()
@@ -208,37 +240,76 @@ class MocopiReceiver(Node):
                 t.transform.rotation.w = trans[3]
                 return t
         return None
-
-    # def broadcast_transforms(self, data):
-    #     transforms = []
-    #     if "fram" in data:
-    #         for (p, c) in pairs:
-    #             trans = self.make_tf(p, c, data)
-    #             if trans:
-    #                 transforms.append(trans)
-    #     if transforms:
-    #         self.br.sendTransform(transforms)
+    
+    def get_absolute_transform(self, target_frame, source_frame):
+        try:
+            trans = self.tf_buffer.lookup_transform(target_frame, source_frame, rclpy.time.Time())
+            return trans.transform
+        except Exception as e:
+            self.get_logger().warn(f"Could not get transform {target_frame} -> {source_frame}: {e}")
+            return None
 
     def broadcast_transforms(self, data):
         transforms = []
         joint_state_msg = JointState()
         joint_state_msg.header.stamp = self.get_clock().now().to_msg()
+
         for (p, c) in pairs:
             trans = self.make_tf(p, c, data)
+            if trans and joint_map[c] == "r_hand":
+                absolute_hand_transform = self.get_absolute_transform("pelvis", "r_hand")
+                if absolute_hand_transform:
+                    roll, _, _ = QuaternionToE(trans.transform.rotation.x, trans.transform.rotation.y, trans.transform.rotation.z, trans.transform.rotation.w)
+                    self.detect_wave(roll, absolute_hand_transform.translation.z)
             if trans:
                 transforms.append(trans)
                 mocopi_joint = joint_map[c] if c < len(joint_map) else None
                 if mocopi_joint and mocopi_joint in mapping:
-                    roll, pitch, yaw = quaternion_to_euler(
-                        trans.transform.rotation.w,
-                        trans.transform.rotation.x,
-                        trans.transform.rotation.y,
-                        trans.transform.rotation.z
-                    )
+
+
+                    x = trans.transform.rotation.x
+                    y = trans.transform.rotation.y
+                    z = trans.transform.rotation.z
+                    w = trans.transform.rotation.w
+                    q = [x, y, z, w]
+                    q_about_z = [x, y, -z, -w]
+
+                    rotated_q_x = rotate_quaternion(q, 'x')
+                    rotated_roll_x, rotated_pitch_x, rotated_yaw_x = QuaternionToE(*rotated_q_x)
+                    rotated_q_y = rotate_quaternion(q, 'y')
+                    rotated_roll_y, rotated_pitch_y, rotated_yaw_y = QuaternionToE(*rotated_q_y)
+
+
+                    rotated_q_about_z_x = rotate_quaternion(q_about_z, 'x')
+                    rotated_q_about_z_y = rotate_quaternion(q_about_z, 'y')
+                    rotated_roll_zx, rotated_pitch_zx, rotated_yaw_zx = QuaternionToE(*rotated_q_about_z_x)
+                    rotated_roll_zy, rotated_pitch_zy, rotated_yaw_zy = QuaternionToE(*rotated_q_about_z_y)
+
+                    roll, pitch, yaw = QuaternionToE(x, y, z, w)
+
                     for urdf_joint, axis in mapping[mocopi_joint]:
-                        angle = {"roll": roll, "pitch": pitch, "yaw": yaw}.get(axis, 0.0)
+                        if urdf_joint == "left_shoulder_yaw_joint" or urdf_joint == "left_shoulder_roll_joint" or urdf_joint == "left_shoulder_pitch_joint":
+                            angle = {"roll": rotated_roll_x, "pitch": rotated_pitch_x, "yaw": rotated_yaw_x}.get(axis, 0.0)
+
+                        elif urdf_joint == "left_elbow_joint":
+                            angle = {"roll": rotated_roll_y, "pitch": rotated_pitch_y, "yaw": rotated_yaw_y}.get(axis, 0.0)
+
+                        elif urdf_joint == "right_shoulder_yaw_joint" or urdf_joint == "right_shoulder_roll_joint" or urdf_joint == "right_shoulder_pitch_joint":
+                            angle = {"roll": rotated_roll_zx, "pitch": rotated_pitch_zx, "yaw": rotated_yaw_zx}.get(axis, 0.0)
+                            angle = angle * -1
+
+                        elif urdf_joint == "right_elbow_joint":
+                            angle = {"roll": rotated_roll_zy, "pitch": rotated_pitch_zy, "yaw": rotated_yaw_zy}.get(axis, 0.0)
+
+                        else:
+                            angle = {"roll": roll, "pitch": pitch, "yaw": yaw}.get(axis, 0.0)
+
+
+
                         joint_state_msg.name.append(urdf_joint)
                         joint_state_msg.position.append(angle)
+
+                    transforms.append(trans)
         self.br.sendTransform(transforms)
         self.joint_state_pub.publish(joint_state_msg)
 

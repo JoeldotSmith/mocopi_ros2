@@ -76,7 +76,7 @@ Visualization Manager:
         torso_6: {Value: true}
         torso_7: {Value: true}
       Marker Alpha: 1
-      Marker Scale: 1
+      Marker Scale: 0.3
       Name: TF
       Show Arrows: true
       Show Axes: false
