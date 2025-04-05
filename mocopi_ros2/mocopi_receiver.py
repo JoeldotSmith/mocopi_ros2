@@ -183,29 +183,44 @@ class MocopiReceiver(Node):
 
         self.hand_positions = []  
         self.last_wave_time = 0
+        self.current_time = 0
+        self.last_handshake_time = 0
         self.wave_threshold = 0.15 
         self.time_window = 5  
     
-    def detect_wave(self, roll, z_pos):
-        current_time = time.time()
-        self.hand_positions.append((current_time, roll, z_pos))
+    def append_data(self, roll, z_pos, x_pos):
+        self.current_time = time.time()
+        self.hand_positions.append((self.current_time, roll, z_pos, x_pos))
+        self.hand_positions = [p for p in self.hand_positions if self.current_time - p[0] < self.time_window]
 
-        self.hand_positions = [p for p in self.hand_positions if current_time - p[0] < self.time_window]
-
+    def detect_wave(self):
         if len(self.hand_positions) < 4: 
             return False
 
-        x_positions = [pos[1] for pos in self.hand_positions]
+        roll_positions = [pos[1] for pos in self.hand_positions]
         z_positions = [pos[2] for pos in self.hand_positions]
         
-        movement_range = max(x_positions) - min(x_positions)
+        movement_range = max(roll_positions) - min(roll_positions)
         avg_z_pos = sum(z_positions) / len(z_positions)
 
-        sign_changes = sum(1 for i in range(1, len(x_positions)) if (x_positions[i] - x_positions[i-1]) * (x_positions[i-1] - x_positions[i-2]) < 0)
+        sign_changes = sum(1 for i in range(1, len(roll_positions)) if (roll_positions[i] - roll_positions[i-1]) * (roll_positions[i-1] - roll_positions[i-2]) < 0)
 
-        if ( movement_range > self.wave_threshold and avg_z_pos > 1.5 and sign_changes >= 2 and  (current_time - self.last_wave_time) > self.time_window):
-            self.last_wave_time = current_time
+        if ( movement_range > self.wave_threshold and avg_z_pos > 1.5 and sign_changes >= 2 and  (self.current_time - self.last_wave_time) > self.time_window):
+            self.last_wave_time = self.current_time
+            print("Wave Detected")
             self.wave_pub.publish(String(data="Wave detected"))
+    
+    def detect_handshake(self):
+        if len(self.hand_positions) < 4: 
+            return False
+        
+        x_positions = [pos[3] for pos in self.hand_positions] 
+        avg_x_pos = sum(x_positions) / len(x_positions)
+
+        if ( avg_x_pos > 0.45 and (self.current_time - self.last_wave_time) > self.time_window):
+            self.last_handshake_time = self.current_time
+            print("Handshake Detected")
+            self.wave_pub.publish(String(data="Handshake detected"))
 
     def receive_data(self):
         try:
@@ -213,7 +228,7 @@ class MocopiReceiver(Node):
             data = _process_packet(message)
             self.broadcast_transforms(data)
         except Exception as e:
-            print()
+            print(e)
 
     def make_tf(self, pframe_id, cframe_id, data):
         t = TransformStamped()
@@ -260,7 +275,9 @@ class MocopiReceiver(Node):
                 absolute_hand_transform = self.get_absolute_transform("pelvis", "r_hand")
                 if absolute_hand_transform:
                     roll, _, _ = QuaternionToE(trans.transform.rotation.x, trans.transform.rotation.y, trans.transform.rotation.z, trans.transform.rotation.w)
-                    self.detect_wave(roll, absolute_hand_transform.translation.z)
+                    self.append_data(roll, absolute_hand_transform.translation.z, absolute_hand_transform.translation.x)
+                    self.detect_wave()
+                    self.detect_handshake()
             if trans:
                 transforms.append(trans)
                 mocopi_joint = joint_map[c] if c < len(joint_map) else None
