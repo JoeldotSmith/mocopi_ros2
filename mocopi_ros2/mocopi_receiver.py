@@ -14,6 +14,7 @@ from geometry_msgs.msg import Quaternion
 from scipy.spatial.transform import Rotation
 
 
+
 # Mocopi joint names and hierarchy
 joint_map = [
     "root",        # 0
@@ -55,11 +56,11 @@ mapping = {
         ("left_shoulder_roll_joint", "roll"),
         ("left_shoulder_yaw_joint", "yaw")
     ],
-    "l_hand": [("left_elbow_joint", "pitch")],
+    "l_low_arm": [ ("left_wrist_pitch_joint", None), ],
     "l_shoulder": [("left_wrist_pitch_joint", None)],
-    "l_low_arm": [
-        ("left_hand_palm_joint", None),
+    "l_hand": [
         ("left_wrist_roll_joint", None),
+        ("left_elbow_joint", "pitch"),
         ("left_wrist_yaw_joint", None)
     ],
 
@@ -69,11 +70,11 @@ mapping = {
         ("right_shoulder_roll_joint", "roll"),
         ("right_shoulder_yaw_joint", "yaw")
     ],
-    "r_hand": [("right_elbow_joint", "pitch")],
+    "r_low_arm": [("right_wrist_pitch_joint", None)], 
     "r_shoulder": [("right_wrist_pitch_joint", None)],
-    "r_low_arm": [
+    "r_hand": [
         ("right_wrist_roll_joint", None),
-        ("right_wrist_pitch_joint", None),
+        ("right_elbow_joint", "pitch"), 
         ("right_wrist_yaw_joint", None)
     ],
 
@@ -121,6 +122,11 @@ def QuaternionToE(x, y, z, w):
 
 def rotate_quaternion(q, axis):
     rot_90 = Rotation.from_euler(axis, 90, degrees=True).as_quat()
+    q_rot = Rotation.from_quat(q) * Rotation.from_quat(rot_90)
+    return q_rot.as_quat()
+
+def rotate_quaternion_negative(q, axis):
+    rot_90 = Rotation.from_euler(axis, -90, degrees=True).as_quat()
     q_rot = Rotation.from_quat(q) * Rotation.from_quat(rot_90)
     return q_rot.as_quat()
 
@@ -289,18 +295,12 @@ class MocopiReceiver(Node):
                     z = trans.transform.rotation.z
                     w = trans.transform.rotation.w
                     q = [x, y, z, w]
-                    q_about_z = [x, y, -z, -w]
 
+                    rotated_q_x_neg = rotate_quaternion_negative(q, 'x')
+                    rotated_roll_x_neg, rotated_pitch_x_neg, rotated_yaw_x_neg = QuaternionToE(*rotated_q_x_neg)
                     rotated_q_x = rotate_quaternion(q, 'x')
                     rotated_roll_x, rotated_pitch_x, rotated_yaw_x = QuaternionToE(*rotated_q_x)
-                    rotated_q_y = rotate_quaternion(q, 'y')
-                    rotated_roll_y, rotated_pitch_y, rotated_yaw_y = QuaternionToE(*rotated_q_y)
 
-
-                    rotated_q_about_z_x = rotate_quaternion(q_about_z, 'x')
-                    rotated_q_about_z_y = rotate_quaternion(q_about_z, 'y')
-                    rotated_roll_zx, rotated_pitch_zx, rotated_yaw_zx = QuaternionToE(*rotated_q_about_z_x)
-                    rotated_roll_zy, rotated_pitch_zy, rotated_yaw_zy = QuaternionToE(*rotated_q_about_z_y)
 
                     roll, pitch, yaw = QuaternionToE(x, y, z, w)
 
@@ -309,14 +309,19 @@ class MocopiReceiver(Node):
                             angle = {"roll": rotated_roll_x, "pitch": rotated_pitch_x, "yaw": rotated_yaw_x}.get(axis, 0.0)
 
                         elif urdf_joint == "left_elbow_joint":
-                            angle = {"roll": rotated_roll_y, "pitch": rotated_pitch_y, "yaw": rotated_yaw_y}.get(axis, 0.0)
+                            rotate = rotate_quaternion_negative(q, 'x')
+                            rotate = rotate_quaternion_negative(rotate, 'y')
+                            r, p, y = QuaternionToE(*rotate)
+                            angle = {"roll": r, "pitch": p, "yaw": y}.get(axis, 0.0)
 
                         elif urdf_joint == "right_shoulder_yaw_joint" or urdf_joint == "right_shoulder_roll_joint" or urdf_joint == "right_shoulder_pitch_joint":
-                            angle = {"roll": rotated_roll_zx, "pitch": rotated_pitch_zx, "yaw": rotated_yaw_zx}.get(axis, 0.0)
-                            angle = angle * -1
+                            angle = {"roll": rotated_roll_x_neg, "pitch": rotated_pitch_x_neg, "yaw": rotated_yaw_x_neg}.get(axis, 0.0)
 
                         elif urdf_joint == "right_elbow_joint":
-                            angle = {"roll": rotated_roll_zy, "pitch": rotated_pitch_zy, "yaw": rotated_yaw_zy}.get(axis, 0.0)
+                            rotate = rotate_quaternion(q, 'x')
+                            rotate = rotate_quaternion_negative(rotate, 'y')
+                            r, p, y = QuaternionToE(*rotate)
+                            angle = {"roll": r, "pitch": p, "yaw": y}.get(axis, 0.0)
 
                         else:
                             angle = {"roll": roll, "pitch": pitch, "yaw": yaw}.get(axis, 0.0)
