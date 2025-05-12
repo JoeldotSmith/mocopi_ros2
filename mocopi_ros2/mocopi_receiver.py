@@ -8,7 +8,7 @@ from rclpy.node import Node
 from std_msgs.msg import String
 from rclpy.time import Time
 import tf2_ros
-from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import TransformStamped, Transform
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Quaternion
 from scipy.spatial.transform import Rotation
@@ -176,8 +176,12 @@ class MocopiReceiver(Node):
     def __init__(self):
         super().__init__('mocopi_receiver')
         self.br = tf2_ros.TransformBroadcaster(self)
+        
         self.joint_state_pub = self.create_publisher(JointState, '/joint_states', 10)
         self.wave_pub = self.create_publisher(String, '/wave_detector', 10)
+        self.r_hand_pub = self.create_publisher(Transform, '/r_hand', 10)
+        self.l_hand_pub = self.create_publisher(Transform, '/l_hand', 10)
+
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind(("", 12351))
         self.get_logger().info("Mocopi receiver started")
@@ -279,11 +283,21 @@ class MocopiReceiver(Node):
             trans = self.make_tf(p, c, data)
             if trans and joint_map[c] == "r_hand":
                 absolute_hand_transform = self.get_absolute_transform("pelvis", "r_hand")
+                absolute_hand_transform_left = self.get_absolute_transform("root", "l_hand")
+                absolute_hand_transform_right = self.get_absolute_transform("root", "l_hand")
+
                 if absolute_hand_transform:
                     roll, _, _ = QuaternionToE(trans.transform.rotation.x, trans.transform.rotation.y, trans.transform.rotation.z, trans.transform.rotation.w)
                     self.append_data(roll, absolute_hand_transform.translation.z, absolute_hand_transform.translation.x)
                     self.detect_wave()
                     self.detect_handshake()
+
+                if absolute_hand_transform_left:
+                    self.l_hand_pub.publish(absolute_hand_transform_left)                
+
+                if absolute_hand_transform_right:
+                    self.r_hand_pub.publish(absolute_hand_transform_right)
+
             if trans:
                 transforms.append(trans)
                 mocopi_joint = joint_map[c] if c < len(joint_map) else None
