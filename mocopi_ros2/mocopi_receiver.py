@@ -284,7 +284,7 @@ class MocopiReceiver(Node):
             if trans and joint_map[c] == "r_hand":
                 absolute_hand_transform = self.get_absolute_transform("pelvis", "r_hand")
                 absolute_hand_transform_left = self.get_absolute_transform("root", "l_hand")
-                absolute_hand_transform_right = self.get_absolute_transform("root", "l_hand")
+                absolute_hand_transform_right = self.get_absolute_transform("root", "r_hand")
 
                 if absolute_hand_transform:
                     roll, _, _ = QuaternionToE(trans.transform.rotation.x, trans.transform.rotation.y, trans.transform.rotation.z, trans.transform.rotation.w)
